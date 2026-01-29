@@ -1,0 +1,112 @@
+﻿<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список точок на карті</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .header, .footer {
+            background-color: #343a40;
+            color: white;
+            padding: 10px 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header .title {
+            font-size: 24px;
+        }
+        .header .home-icon {
+            cursor: pointer;
+        }
+        .container {
+            padding: 20px;
+            flex: 1;
+        }
+        .map-container {
+            height: 500px;
+            margin-bottom: 20px;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+    <script>
+        function initMap() {
+            var map = new google.maps.Map(document.getElementById('map'), {
+                center: {lat: 49.8379908222528, lng: 24.0567539396184},
+                zoom: 14
+            });
+
+            var locations = [
+                {title: 'Личаківська, 92', position: {lat: 49.8379908222528, lng: 24.0567539396184}},
+                {title: 'Личаківська, 97', position: {lat: 49.8393199973384, lng: 24.0525014877714}},
+                {title: 'Личаківська, 100', position: {lat: 49.8378081143894, lng: 24.0575736787365}},
+                {title: 'Личаківська, 101', position: {lat: 49.839136310658, lng: 24.0531083674857}},
+                {title: 'Личаківська, 102', position: {lat: 49.8377345778462, lng: 24.0579279811541}},
+                {title: 'Личаківська, 103', position: {lat: 49.839001407855, lng: 24.0535846286954}},
+                {title: 'Личаківська, 106', position: {lat: 49.8375847332495, lng: 24.0586070230844}},
+                {title: 'Личаківська, 111', position: {lat: 49.838623059982, lng: 24.0552965297925}}
+            ];
+
+            locations.forEach(function(location) {
+                var marker = new google.maps.Marker({
+                    position: location.position,
+                    map: map,
+                    title: location.title
+                });
+
+                var infoWindow = new google.maps.InfoWindow({
+                    content: '<div><h5>' + location.title + '</h5><button class="btn btn-primary btn-sm" onclick="editPoint(\'' + location.title + '\')">Редагувати</button> <button class="btn btn-danger btn-sm" onclick="deletePoint(\'' + location.title + '\')">Видалити</button></div>'
+                });
+
+                marker.addListener('click', function() {
+                    infoWindow.open(map, marker);
+                });
+            });
+        }
+
+        function editPoint(title) {
+            alert('Редагувати: ' + title);
+        }
+
+        function deletePoint(title) {
+            alert('Видалити: ' + title);
+        }
+    </script>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title">Список точок на карті</div>
+        <div class="home-icon" onclick="location.href='index.html'">Головна</div>
+    </div>
+
+    <div class="container">
+        <div id="map" class="map-container"></div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2026 Укриття Рівне. Всі права захищені.</p>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key='АПІ_КЛЮЧ'&callback=initMap&language=uk">
+        </script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+﻿@* @model TModel *@
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Додати точку</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .header, .footer {
+            background-color: #343a40;
+            color: white;
+            padding: 10px 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header .title {
+            font-size: 24px;
+        }
+        .header .home-icon {
+            cursor: pointer;
+        }
+        .container {
+            padding: 20px;
+            flex: 1;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title">Додати нову точку</div>
+        <div class="home-icon" onclick="location.href='index.html'">Головна</div>
+    </div>
+
+    <div class="container">
+        <form>
+            <div class="form-group">
+                <label for="name">Назва</label>
+                <input type="text" class="form-control" id="name" placeholder="Введіть назву">
+            </div>
+            <div class="form-group">
+                <label for="address">Адреса</label>
+                <input type="text" class="form-control" id="address" placeholder="Введіть адресу">
+            </div>
+            <div class="form-group">
+                <label for="hours">Графік роботи</label>
+                <input type="text" class="form-control" id="hours" placeholder="Введіть графік роботи">
+            </div>
+            <div class="form-group">
+                <label for="capacity">Місткість (осіб)</label>
+                <input type="number" class="form-control" id="capacity" placeholder="Введіть місткість">
+            </div>
+            <button type="submit" class="btn btn-primary">Додати точку</button>
+        </form>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2024 Назва сайту. Всі права захищені.</p>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

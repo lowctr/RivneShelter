@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  shelters-api:
+    build:
+      context: ./RivneSheltersProject
+      dockerfile: Dockerfile
+    container_name: rivne-shelters-api
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/shelters.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

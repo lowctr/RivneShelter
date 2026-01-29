@@ -1,0 +1,514 @@
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<IdentityUser> SignInManager
+@inject UserManager<IdentityUser> UserManager
+
+@{
+    Layout = "_Layout";
+    ViewBag.Title = "Укриття";
+}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #f8f9fa;
+        }
+        .header, .footer {
+            background-color: #343a40;
+            color: white;
+            padding: 10px 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header .title {
+            font-size: 24px;
+        }
+        .header .admin-icon {
+            cursor: pointer;
+        }
+        #map {
+            width: 100%;
+            height: 500px;
+            flex: 1;
+        }
+        .container {
+            padding: 20px;
+            text-align: center;
+        }
+        .route-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .route-btn:hover {
+            background-color: #0056b3;
+        }
+        .modal-content {
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+    @Html.Raw("<script src=\"https://unpkg.com/@google/markerclustererplus/dist/markerclustererplus.min.js\"></script>")
+    <script>
+        var map, directionsService, directionsRenderer, markerCluster;
+
+                function initMap() {
+                    var rivne = { lat: 50.6199, lng: 26.2253 };
+                    map = new google.maps.Map(document.getElementById('map'), {
+                        center: rivne,
+                        zoom: 13,
+                        gestureHandling: 'greedy'
+                    });
+
+                    directionsService = new google.maps.DirectionsService();
+                    directionsRenderer = new google.maps.DirectionsRenderer();
+                    directionsRenderer.setMap(map);
+
+                    var markers = [];
+                    fetch('/api/locations')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Помилка сервера: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(locations => {
+                            if (!locations || locations.length === 0) {
+                                console.warn('Локації не знайдено');
+                                return;
+                            }
+                            locations.forEach(function(location) {
+                                var marker = new google.maps.Marker({
+                                    position: { lat: location.latitude, lng: location.longitude },
+                                    map: map,
+                                    title: location.address
+                                });
+                                google.maps.event.addListener(marker, 'click', function() {
+                                    fetch(`/api/locations/${location.id}`)
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                throw new Error(`Помилка завантаження деталей: ${response.status}`);
+                                            }
+                                            return response.json();
+                                        })
+                                        .then(data => {
+                                            updateModalContent(data);
+                                            $('#locationModal').modal('show');
+                                        })
+                                        .catch(error => {
+                                            console.error('Error loading the location details:', error);
+                                            alert('Не вдалося завантажити деталі локації. Спробуйте пізніше.');
+                                        });
+                                });
+
+                                markers.push(marker);
+                            });
+                            markerCluster = new MarkerClusterer(map, markers, {
+                                imagePath: 'https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m'
+                            });
+                        })
+                        .catch(error => {
+                            console.error('Помилка завантаження локацій:', error);
+                            alert('Не вдалося завантажити список укриттів. Перевірте підключення до сервера.');
+                        });
+
+                    function updateModalContent(location) {
+                        document.querySelector('#locationModal .modal-title').textContent = 'Інформація про локацію';
+                        document.querySelector('#locationModal .modal-body').innerHTML = `
+                            <p><strong>Адреса:</strong> ${location.address}</p>
+                            <p><strong>Форма власності:</strong> ${location.ownership}</p>
+                            <p><strong>Балансоутримувач:</strong> ${location.holder}</p>
+                            <p><strong>Доступність для інвалідів:</strong> ${location.accessibility}</p>
+                            <p><strong>Контакт відповідального:</strong> ${location.contact || 'Не вказано'}</p>
+                            <p><strong>Номер укриття:</strong> ${location.number || 'Не вказано'}</p>
+                        `;
+                        window.currentLocationId = location.id;
+                    }
+
+                    window.calculateAndDisplayRoute = async function() {
+                        if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition(async function(position) {
+                                // var currentLocation = {
+                                //     lat: position.coords.latitude,
+                                //     lng: position.coords.longitude 
+                                // };
+                                var currentLocation = {
+                                    lat: 50.63232006796073,  // TEST: Rivne coordinates
+                                    lng: 26.27664044997071   // TODO: remove after testing
+                                };
+                                console.log("Current Location:", currentLocation);
+
+                                try {
+                                    const nearestLocations = await getNearestLocations(currentLocation);
+                                    console.log("Nearest Locations:", nearestLocations);
+
+                                    if (nearestLocations && nearestLocations.length > 0) {
+                                        const nearestLocation = await findNearestWalkingRoute(currentLocation, nearestLocations);
+                                        console.log("Nearest Location:", nearestLocation);
+
+                                        if (nearestLocation) {
+                                            directionsService.route({
+                                                origin: currentLocation,
+                                                destination: { lat: nearestLocation.latitude, lng: nearestLocation.longitude },
+                                                travelMode: 'WALKING'
+                                            }, function(response, status) {
+                                                if (status === 'OK') {
+                                                    directionsRenderer.setDirections(response);
+                                                } else {
+                                                    window.alert('Не вдалося побудувати маршрут через: ' + status);
+                                                }
+                                            });
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error("Error calculating route:", error);
+                                }
+                            }, function() {
+                                window.alert('Геолокація відмовлена або недоступна.');
+                            });
+                        } else {
+                            window.alert('Геолокація не підтримується вашим браузером.');
+                        }
+                    }
+                }
+
+                async function getUserLocation() {
+                    return new Promise((resolve, reject) => {
+                        if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition(position => {
+                                const userLocation = {
+                                    latitude: position.coords.latitude,
+                                    longitude: position.coords.longitude
+                                };
+                                resolve(userLocation);
+                            }, error => {
+                                reject(error);
+                            });
+                        } else {
+                            reject(new Error("Geolocation is not supported by this browser."));
+                        }
+                    });
+                }
+
+                async function getNearestLocations(userLocation) {
+                    try {
+                        const response = await fetch(`/api/locations/nearest?userLatitude=${userLocation.lat}&userLongitude=${userLocation.lng}`);
+                        const locations = await response.json();
+
+                        console.log('Nearest Locations:', locations);
+                        return locations;
+                    } catch (error) {
+                        console.error("Error getting nearest locations:", error);
+                        throw error;
+                    }
+                }
+
+                async function findNearestWalkingRoute(userLocation, locations) {
+                    console.log('findNearestWalkingRoute:');
+                    const origins = `${userLocation.lat},${userLocation.lng}`;
+                    const destinations = locations.map(loc => `${loc.latitude},${loc.longitude}`).join('|');
+
+                    try {
+                        const response = await fetch(`/api/locations/GetDistanceMatrix?origins=${origins}&destinations=${destinations}&mode=walking`);
+                        const data = await response.json();
+                        console.log('Distance Matrix API response:', data);
+
+                        if (!data.rows || !data.rows[0] || !data.rows[0].elements) {
+                            console.error('Invalid API response structure:', data);
+                            return null;
+                        }
+
+                        let nearestLocation = null;
+                        let minDuration = Infinity;
+
+                        for (let i = 0; i < data.rows[0].elements.length; i++) {
+                            const element = data.rows[0].elements[i];
+                            if (element.status === "OK" && element.duration.value < minDuration) {
+                                minDuration = element.duration.value;
+                                nearestLocation = locations[i];
+                            }
+                        }
+                        console.log('nearestLocation:', nearestLocation);
+                        return nearestLocation;
+                    } catch (error) {
+                        console.error('Error finding nearest walking route:', error);
+                        return null;
+                    }
+                }
+
+                async function getDistanceMatrix(origins, destinations, mode) {
+                    try {
+                        const response = await fetch(`/api/maps/GetDistanceMatrix?origins=${origins}&destinations=${destinations}&mode=${mode}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch distance matrix from the server');
+                        }
+                        const data = await response.json();
+                        console.log(data);
+                        return data;
+                    } catch (error) {
+                        console.error('Error fetching distance matrix:', error);
+                    }
+                }
+
+        function closeModal() {
+            $('#locationModal').modal('hide');
+        }
+
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('locationModal')) {
+                $('#locationModal').modal('hide');
+            }
+        }
+
+        function showRouteModal() {
+            $('#locationModal').modal('show');
+        }
+
+        function showRoute() {
+            calculateAndDisplayRoute(directionsService, directionsRenderer);
+        }
+
+        function deleteLocation(id) {
+            if (confirm("Ви впевнені, що хочете видалити цю локацію?")) {
+                fetch(`/api/locations/${window.currentLocationId}`, { method: 'DELETE' })
+                    .then(response => {
+                        if (response.ok) {
+                            $('#locationModal').modal('hide');
+                            alert('Локацію видалено.');
+                        } else {
+                            alert('Помилка при видаленні локації.');
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function editLocation() {
+            fetch(`/api/locations/${window.currentLocationId}`)
+                .then(response => response.json())
+                .then(data => {
+                    showEditForm(data);
+                })
+                .catch(error => console.error('Error loading location:', error));
+        }
+
+        function showEditForm(location) {
+            const modalBody = document.querySelector('#editLocationModal .modal-body');
+            modalBody.innerHTML = `
+            <form id="editLocationForm">
+                <label for="address">Адреса:</label>
+                <input type="text" id="address" name="address" value="${location.address}" required><br>
+                <label for="ownership">Форма власності:</label>
+                <input type="text" id="ownership" name="ownership" value="${location.ownership}" required><br>
+                <label for="holder">Балансоутримувач:</label>
+                <input type="text" id="holder" name="holder" value="${location.holder}" required><br>
+                <label for="accessibility">Доступність для інвалідів:</label>
+                <input type="text" id="accessibility" name="accessibility" value="${location.accessibility}" required><br>
+                <label for="contact">Контакт відповідального:</label>
+                <input type="text" id="contact" name="contact" value="${location.contact || ''}"><br>
+                <label for="number">Номер укриття:</label>
+                <input type="text" id="number" name="number" value="${location.number || ''}"><br>
+                <button type="submit" class="btn btn-primary">Зберегти зміни</button>
+            </form>
+            `;
+            $('#editLocationModal').modal('show');
+
+
+        document.querySelector('#editLocationForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = {};
+
+            const address = document.querySelector('#address').value;
+            const ownership = document.querySelector('#ownership').value;
+            const holder = document.querySelector('#holder').value;
+            const accessibility = document.querySelector('#accessibility').value;
+            const contact = document.querySelector('#contact').value;
+            const number = document.querySelector('#number').value;
+
+            if (address) formData.address = address;
+            if (ownership) formData.ownership = ownership;
+            if (holder) formData.holder = holder;
+            if (accessibility) formData.accessibility = accessibility;
+            if (contact) formData.contact = contact;
+            if (number) formData.number = number;
+
+            fetch(`/api/locations/${window.currentLocationId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Локацію оновлено.');
+                        $('#editLocationModal').modal('hide');
+                    } else {
+                        throw new Error('Failed to update location');
+                    }
+                })
+                .catch(error => console.error('Error updating location:', error));
+        });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const addForm = document.querySelector('#addLocationForm');
+            if (addForm) {
+                addForm.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    const formData = {
+                        address: document.querySelector('#newAddress').value,
+                        ownership: document.querySelector('#newOwnership').value,
+                        holder: document.querySelector('#newHolder').value,
+                        accessibility: document.querySelector('#newAccessibility').value,
+                        contact: document.querySelector('#newContact').value,
+                        number: document.querySelector('#newNumber').value,
+                        latitude: parseFloat(document.querySelector('#newLatitude').value),
+                        longitude: parseFloat(document.querySelector('#newLongitude').value),
+                    };
+
+                    fetch('/api/locations', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data) {
+                                alert('Нову локацію додано.');
+                                $('#addLocationModal').modal('hide');
+                            } else {
+                                throw new Error('Failed to add location');
+                            }
+                        })
+                        .catch(error => console.error('Error adding location:', error));
+                });
+            } else {
+                console.error('Form with id #addLocationForm not found.');
+            }
+        });
+    </script>
+
+    <div id="map"></div>
+
+    <div class="container">
+        <button class="route-btn" onclick="showRoute()">Прокласти маршрут до найближчого укриття</button>
+    </div>
+@if (SignInManager.IsSignedIn(User))
+{
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+        Додати нову локацію
+    </button>
+}
+<div id="locationModal" class="modal fade" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Інформація про локацію</h5>
+                    <button type="button" class="close" data-dismiss="modal" onclick="closeModal();" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Адреса:</strong> </p>
+                    <p><strong>Форма власності:</strong> </p>
+                    <p><strong>Балансоутримувач:</strong> </p>
+                    <p><strong>Доступність для інвалідів:</strong> </p>
+                    <p><strong>Контакт відповідального:</strong> </p>
+                    <p><strong>Номер укриття:</strong> </p>
+                </div>
+                <div id="editLocationModal" class="modal fade" tabindex="-1" role="dialog">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Редагування Локації</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- Форма вставляється динамічно JavaScript кодом -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <button onclick="editLocation()" class="btn btn-primary">Редагувати</button>
+                        <button onclick="deleteLocation()" class="btn btn-danger">Видалити</button>
+                    }
+                    <button type="button" class="btn btn-secondary" onclick="closeModal();" data-dismiss="modal">Закрити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<div class="modal fade" id="addLocationModal" tabindex="-1" aria-labelledby="addLocationModalLabel" aria-hidden="true">
+    <div class="modal-dialog" style="text-align: left;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addLocationModalLabel">Додати нову локацію</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addLocationForm">
+                    <div class="mb-3">
+                        <label for="newAddress" class="form-label">Адреса</label>
+                        <input type="text" class="form-control" id="newAddress" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newOwnership" class="form-label">Форма власності</label>
+                        <input type="text" class="form-control" id="newOwnership" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newHolder" class="form-label">Балансоутримувач</label>
+                        <input type="text" class="form-control" id="newHolder" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newAccessibility" class="form-label">Доступність для інвалідів</label>
+                        <input type="text" class="form-control" id="newAccessibility" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newContact" class="form-label">Контакт відповідального</label>
+                        <input type="text" class="form-control" id="newContact">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newNumber" class="form-label">Номер укриття</label>
+                        <input type="text" class="form-control" id="newNumber">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newLatitude" class="form-label">Широта</label>
+                        <input type="number" step="any" class="form-control" id="newLatitude" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newLongitude" class="form-label">Довгота</label>
+                        <input type="number" step="any" class="form-control" id="newLongitude" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Додати</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script async
+        src="https://maps.googleapis.com/maps/api/js?key='ВАШ_АПІ_КЛЮЧ'&libraries=geometry&callback=initMap&language=uk&loading=async">
+    </script>
